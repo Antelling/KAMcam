@@ -1,0 +1,64 @@
+import { d } from 'typegpu';
+
+export const SculptureStateA = d.struct({
+  theta0: d.f32,
+  omega0: d.f32,
+  theta1: d.f32,
+  omega1: d.f32,
+});
+
+export const SculptureStateB = d.struct({
+  theta2: d.f32,
+  omega2: d.f32,
+  theta3: d.f32,
+  omega3: d.f32,
+});
+
+export const SculptureParams = d.struct({
+  scM0: d.f32,
+  scL0: d.f32,
+  scA0: d.f32,
+  scR: d.f32,
+  scN: d.f32,
+  dt: d.f32,
+  resolution: d.f32,
+  cA00_t0: d.f32,
+  cA00_w0: d.f32,
+  cA00_t1: d.f32,
+  cA00_w1: d.f32,
+  cA10_t0: d.f32,
+  cA10_w0: d.f32,
+  cA10_t1: d.f32,
+  cA10_w1: d.f32,
+  cA01_t0: d.f32,
+  cA01_w0: d.f32,
+  cA01_t1: d.f32,
+  cA01_w1: d.f32,
+  cA11_t0: d.f32,
+  cA11_w0: d.f32,
+  cA11_t1: d.f32,
+  cA11_w1: d.f32,
+  cB00_t2: d.f32,
+  cB00_w2: d.f32,
+  cB00_t3: d.f32,
+  cB00_w3: d.f32,
+  cB10_t2: d.f32,
+  cB10_w2: d.f32,
+  cB10_t3: d.f32,
+  cB10_w3: d.f32,
+  cB01_t2: d.f32,
+  cB01_w2: d.f32,
+  cB01_t3: d.f32,
+  cB01_w3: d.f32,
+  cB11_t2: d.f32,
+  cB11_w2: d.f32,
+  cB11_t3: d.f32,
+  cB11_w3: d.f32,
+});
+
+export const DataCell = d.struct({
+  r: d.f32,
+  g: d.f32,
+  b: d.f32,
+  a: d.f32,
+});
