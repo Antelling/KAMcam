@@ -39,14 +39,75 @@
     button:hover {
       background: #444;
     }
+    .main-layout {
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+    }
+    .main-panel {
+      flex-shrink: 0;
+    }
+    #previewPanel {
+      display: none;
+      flex-shrink: 0;
+    }
+    #previewPanel.active {
+      display: block;
+    }
+    #previewPanel button {
+      margin-top: 4px;
+      margin-right: 4px;
+      padding: 6px 14px;
+      font-size: 0.8rem;
+    }
+    #previewCanvas, #graphCanvas, #poincareCanvas {
+      display: block;
+      background: #000;
+      margin-top: 8px;
+    }
+    #pendulumDescription {
+      width: 100%;
+      height: 80px;
+      background: #1a1a1a;
+      color: #aaa;
+      border: 1px solid #444;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 0.75rem;
+      padding: 6px;
+      margin-top: 6px;
+      box-sizing: border-box;
+      resize: vertical;
+    }
+    #previewStatus {
+      font-size: 0.8rem;
+      color: #888;
+      margin-top: 6px;
+    }
   </style>
 </head>
 <body>
   <h1>KAMcam</h1>
-  <canvas id="canvas" width="512" height="512"></canvas>
-  <br>
-  <button id="playBtn">Play</button>
-  <div id="status">Initializing...</div>
+  <div class="main-layout">
+    <div class="main-panel">
+      <canvas id="canvas" width="512" height="512"></canvas>
+      <br>
+      <button id="playBtn">Play</button>
+      <button id="previewToggleBtn">Preview</button>
+      <div id="status">Initializing...</div>
+    </div>
+    <div id="previewPanel">
+      <div id="playbackControls" style="display:none;">
+        <button id="playPauseBtn">Pause</button>
+        <button id="savePeriodBtn">Copy Description</button>
+      </div>
+      <canvas id="previewCanvas" width="500" height="500"></canvas>
+      <canvas id="graphCanvas" width="500" height="200"></canvas>
+      <canvas id="poincareCanvas" width="500" height="300"></canvas>
+      <textarea id="pendulumDescription" readonly></textarea>
+      <div id="previewStatus">Click map to sample initial condition</div>
+    </div>
+  </div>
   <script type="module" src="/src/main.ts"></script>
 </body>
 </html>
