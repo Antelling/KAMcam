@@ -1,0 +1,21 @@
+{
+  "name": "kamcam",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "typecheck": "tsc --noEmit",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "typegpu": "^0.11.9"
+  },
+  "devDependencies": {
+    "@webgpu/types": "^0.1.71",
+    "typescript": "~5.7.0",
+    "unplugin-typegpu": "^0.11.6",
+    "vite": "^6.0.0"
+  }
+}

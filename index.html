@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KAMcam</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      background: #111;
+      color: #ccc;
+      padding: 16px;
+    }
+    #canvas {
+      display: inline-block;
+      cursor: crosshair;
+      background: #000;
+    }
+    #status {
+      font-size: 0.85rem;
+      color: #888;
+      margin-top: 8px;
+    }
+  </style>
+</head>
+<body>
+  <h1>KAMcam</h1>
+  <canvas id="canvas" width="512" height="512"></canvas>
+  <div id="status">Initializing…</div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
