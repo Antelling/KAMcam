@@ -1,4 +1,5 @@
 import { std } from 'typegpu';
+import { hash } from '../shared/hash';
 
 type V4 = { x: number; y: number; z: number; w: number };
 
@@ -94,6 +95,56 @@ export const systemDeriv = (
     dt2: w2, dw2: al.z,
     dt3: w3, dw3: al.w,
   };
+};
+
+export const sculptureDivergence = (
+  bt0: number, bw0: number, bt1: number, bw1: number,
+  bt2: number, bw2: number, bt3: number, bw3: number,
+  pt0: number, pw0: number, pt1: number, pw1: number,
+  pt2: number, pw2: number, pt3: number, pw3: number,
+  N: number,
+) => {
+  'use gpu';
+  const TWO_PI = 2.0 * std.acos(0);
+  const TOL_LO = 0.05;
+  const TOL_HI = 1.0;
+  const OMEGA_SCALE = 2.0;
+  const ratio = TOL_HI / TOL_LO;
+  const invN = N <= 1.0 ? 0.0 : 1.0 / (N - 1.0);
+  let sum = 0.0;
+  const g0 = N <= 1.0 ? 0.0 : 0.0;
+  const g1 = N <= 1.0 ? 0.0 : 1.0 * invN;
+  const g2 = N <= 1.0 ? 0.0 : 2.0 * invN;
+  const g3 = N <= 1.0 ? 0.0 : 3.0 * invN;
+  let da0 = bt0 - pt0;
+  da0 = da0 - std.floor(da0 / TWO_PI + 0.5) * TWO_PI;
+  let da1 = bt1 - pt1;
+  da1 = da1 - std.floor(da1 / TWO_PI + 0.5) * TWO_PI;
+  let da2 = bt2 - pt2;
+  da2 = da2 - std.floor(da2 / TWO_PI + 0.5) * TWO_PI;
+  let da3 = bt3 - pt3;
+  da3 = da3 - std.floor(da3 / TWO_PI + 0.5) * TWO_PI;
+  if (N >= 1.0) {
+    const tolA = TOL_LO * std.exp(g0 * std.log(ratio));
+    const tolW = tolA * OMEGA_SCALE;
+    sum = sum + (da0 * da0) / (tolA * tolA) + (bw0 - pw0) * (bw0 - pw0) / (tolW * tolW);
+  }
+  if (N >= 2.0) {
+    const tolA = TOL_LO * std.exp(g1 * std.log(ratio));
+    const tolW = tolA * OMEGA_SCALE;
+    sum = sum + (da1 * da1) / (tolA * tolA) + (bw1 - pw1) * (bw1 - pw1) / (tolW * tolW);
+  }
+  if (N >= 3.0) {
+    const tolA = TOL_LO * std.exp(g2 * std.log(ratio));
+    const tolW = tolA * OMEGA_SCALE;
+    sum = sum + (da2 * da2) / (tolA * tolA) + (bw2 - pw2) * (bw2 - pw2) / (tolW * tolW);
+  }
+  if (N >= 4.0) {
+    const tolA = TOL_LO * std.exp(g3 * std.log(ratio));
+    const tolW = tolA * OMEGA_SCALE;
+    sum = sum + (da3 * da3) / (tolA * tolA) + (bw3 - pw3) * (bw3 - pw3) / (tolW * tolW);
+  }
+  return sum;
 };
 
 export const computeSculptureTip = (

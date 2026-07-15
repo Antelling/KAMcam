@@ -76,7 +76,7 @@ export class KAMcamApp {
       this.maxValue,
       this.config.colormap,
       this.config.toneMapping,
-      this.config.vizMode === 'distance' ? 0 : 0,
+      this.simulator!.getVizModeIndex(),
       this.config.resolution,
     );
     this.renderer!.render(this.canvasContext!);

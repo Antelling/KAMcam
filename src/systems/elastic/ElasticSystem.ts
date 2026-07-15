@@ -2,8 +2,9 @@ import { tgpu, d, std } from 'typegpu';
 import type { TgpuRoot } from 'typegpu';
 import type { SimulationConfig } from '../../config/schema';
 import { computeCorners, elasticPackA, elasticPackB } from '../../config/corners';
-import { ElasticStateA, ElasticStateB, ElasticParams, DataCell } from './types';
+import { ElasticStateA, ElasticStateB, ElasticParams, DivParams, DataCell } from './types';
 import { systemDeriv, computeBob2 } from './deriv';
+import { hash } from '../shared/hash';
 import type { System } from '../System';
 
 export class ElasticSystem implements System {
@@ -28,6 +29,21 @@ export class ElasticSystem implements System {
   private paramsBuffer: any = null;
   private dataBuf: any = null;
   private _readIndex: 0 | 1 = 0;
+  private pertStateAa: any = null;
+  private pertStateAb: any = null;
+  private pertStateBa: any = null;
+  private pertStateBb: any = null;
+  private divDataBuf: any = null;
+  private divParamsBuffer: any = null;
+  private divInitLayout: any = null;
+  private divStepLayout: any = null;
+  private divInitPipeline: any = null;
+  private divStepPipeline: any = null;
+  private divInitBG: any = null;
+  private divStepFwd: any = null;
+  private divStepBwd: any = null;
+  private divFrameCounter = 0;
+  private lastConfig!: SimulationConfig;
 
   build(root: TgpuRoot, config: SimulationConfig, cellCount: number): void {
     this.root = root;
@@ -97,33 +113,21 @@ export class ElasticSystem implements System {
       const dt = p.dt;
       const hdt = 0.5 * dt;
       const d1 = systemDeriv(sa.theta1, sa.omega1, sa.stretch1, sa.stretchRate1, sb.theta2, sb.omega2, sb.stretch2, sb.stretchRate2, p.m1, p.m2, p.L1, p.L2, p.k1, p.k2);
-      const k2sa_th = sa.theta1 + hdt * d1.da_th;
-      const k2sa_om = sa.omega1 + hdt * d1.da_om;
-      const k2sa_r = sa.stretch1 + hdt * d1.da_r;
-      const k2sa_dr = sa.stretchRate1 + hdt * d1.da_dr;
-      const k2sb_th = sb.theta2 + hdt * d1.db_th;
-      const k2sb_om = sb.omega2 + hdt * d1.db_om;
-      const k2sb_r = sb.stretch2 + hdt * d1.db_r;
-      const k2sb_dr = sb.stretchRate2 + hdt * d1.db_dr;
-      const d2 = systemDeriv(k2sa_th, k2sa_om, k2sa_r, k2sa_dr, k2sb_th, k2sb_om, k2sb_r, k2sb_dr, p.m1, p.m2, p.L1, p.L2, p.k1, p.k2);
-      const k3sa_th = sa.theta1 + hdt * d2.da_th;
-      const k3sa_om = sa.omega1 + hdt * d2.da_om;
-      const k3sa_r = sa.stretch1 + hdt * d2.da_r;
-      const k3sa_dr = sa.stretchRate1 + hdt * d2.da_dr;
-      const k3sb_th = sb.theta2 + hdt * d2.db_th;
-      const k3sb_om = sb.omega2 + hdt * d2.db_om;
-      const k3sb_r = sb.stretch2 + hdt * d2.db_r;
-      const k3sb_dr = sb.stretchRate2 + hdt * d2.db_dr;
-      const d3 = systemDeriv(k3sa_th, k3sa_om, k3sa_r, k3sa_dr, k3sb_th, k3sb_om, k3sb_r, k3sb_dr, p.m1, p.m2, p.L1, p.L2, p.k1, p.k2);
-      const k4sa_th = sa.theta1 + dt * d3.da_th;
-      const k4sa_om = sa.omega1 + dt * d3.da_om;
-      const k4sa_r = sa.stretch1 + dt * d3.da_r;
-      const k4sa_dr = sa.stretchRate1 + dt * d3.da_dr;
-      const k4sb_th = sb.theta2 + dt * d3.db_th;
-      const k4sb_om = sb.omega2 + dt * d3.db_om;
-      const k4sb_r = sb.stretch2 + dt * d3.db_r;
-      const k4sb_dr = sb.stretchRate2 + dt * d3.db_dr;
-      const d4 = systemDeriv(k4sa_th, k4sa_om, k4sa_r, k4sa_dr, k4sb_th, k4sb_om, k4sb_r, k4sb_dr, p.m1, p.m2, p.L1, p.L2, p.k1, p.k2);
+      const d2 = systemDeriv(
+        sa.theta1 + hdt * d1.da_th, sa.omega1 + hdt * d1.da_om, sa.stretch1 + hdt * d1.da_r, sa.stretchRate1 + hdt * d1.da_dr,
+        sb.theta2 + hdt * d1.db_th, sb.omega2 + hdt * d1.db_om, sb.stretch2 + hdt * d1.db_r, sb.stretchRate2 + hdt * d1.db_dr,
+        p.m1, p.m2, p.L1, p.L2, p.k1, p.k2
+      );
+      const d3 = systemDeriv(
+        sa.theta1 + hdt * d2.da_th, sa.omega1 + hdt * d2.da_om, sa.stretch1 + hdt * d2.da_r, sa.stretchRate1 + hdt * d2.da_dr,
+        sb.theta2 + hdt * d2.db_th, sb.omega2 + hdt * d2.db_om, sb.stretch2 + hdt * d2.db_r, sb.stretchRate2 + hdt * d2.db_dr,
+        p.m1, p.m2, p.L1, p.L2, p.k1, p.k2
+      );
+      const d4 = systemDeriv(
+        sa.theta1 + dt * d3.da_th, sa.omega1 + dt * d3.da_om, sa.stretch1 + dt * d3.da_r, sa.stretchRate1 + dt * d3.da_dr,
+        sb.theta2 + dt * d3.db_th, sb.omega2 + dt * d3.db_om, sb.stretch2 + dt * d3.db_r, sb.stretchRate2 + dt * d3.db_dr,
+        p.m1, p.m2, p.L1, p.L2, p.k1, p.k2
+      );
       const s6 = dt / 6.0;
       stepLayout.$.nextA[cellIndex] = ElasticStateA({
         theta1: sa.theta1 + s6 * (d1.da_th + 2.0 * d2.da_th + 2.0 * d3.da_th + d4.da_th),
@@ -165,6 +169,158 @@ export class ElasticSystem implements System {
     this.accA = root.createBindGroup(this.accumulateLayout, { currentA: stateAa, currentB: stateBa, data: this.dataBuf, params: this.paramsBuffer });
     this.accB = root.createBindGroup(this.accumulateLayout, { currentA: stateAb, currentB: stateBb, data: this.dataBuf, params: this.paramsBuffer });
     this._readIndex = 0;
+
+    this.pertStateAa = root.createBuffer(this.StateArrayA, this.zeroStateA()).$usage('storage');
+    this.pertStateAb = root.createBuffer(this.StateArrayA, this.zeroStateA()).$usage('storage');
+    this.pertStateBa = root.createBuffer(this.StateArrayB, this.zeroStateB()).$usage('storage');
+    this.pertStateBb = root.createBuffer(this.StateArrayB, this.zeroStateB()).$usage('storage');
+    this.divDataBuf = root.createBuffer(this.DataArray, this.zeroDivDataArray()).$usage('storage');
+    this.divParamsBuffer = root.createBuffer(DivParams, this.buildDivParamsData(config, 0, 0)).$usage('uniform');
+
+    this.divInitLayout = tgpu.bindGroupLayout({
+      baseStateA: { storage: this.StateArrayA, access: 'mutable' },
+      baseStateB: { storage: this.StateArrayB, access: 'mutable' },
+      pertStateA: { storage: this.StateArrayA, access: 'mutable' },
+      pertStateB: { storage: this.StateArrayB, access: 'mutable' },
+      divData: { storage: this.DataArray, access: 'mutable' },
+      params: { uniform: DivParams },
+    });
+    this.divStepLayout = tgpu.bindGroupLayout({
+      baseCurrentA: { storage: this.StateArrayA },
+      baseCurrentB: { storage: this.StateArrayB },
+      pertCurrentA: { storage: this.StateArrayA },
+      pertCurrentB: { storage: this.StateArrayB },
+      baseNextA: { storage: this.StateArrayA, access: 'mutable' },
+      baseNextB: { storage: this.StateArrayB, access: 'mutable' },
+      pertNextA: { storage: this.StateArrayA, access: 'mutable' },
+      pertNextB: { storage: this.StateArrayB, access: 'mutable' },
+      divData: { storage: this.DataArray, access: 'mutable' },
+      params: { uniform: DivParams },
+    });
+
+    const divInitLayout = this.divInitLayout;
+    const divStepLayout = this.divStepLayout;
+
+    const rk4Step = (
+      th1: number, om1: number, r1: number, dr1: number,
+      th2: number, om2: number, r2: number, dr2: number,
+      m1: number, m2: number, L1: number, L2: number, k1: number, k2: number, dt: number
+    ) => {
+      'use gpu';
+      const hdt = 0.5 * dt;
+      const e1 = systemDeriv(th1, om1, r1, dr1, th2, om2, r2, dr2, m1, m2, L1, L2, k1, k2);
+      const e2 = systemDeriv(
+        th1 + hdt * e1.da_th, om1 + hdt * e1.da_om, r1 + hdt * e1.da_r, dr1 + hdt * e1.da_dr,
+        th2 + hdt * e1.db_th, om2 + hdt * e1.db_om, r2 + hdt * e1.db_r, dr2 + hdt * e1.db_dr,
+        m1, m2, L1, L2, k1, k2
+      );
+      const e3 = systemDeriv(
+        th1 + hdt * e2.da_th, om1 + hdt * e2.da_om, r1 + hdt * e2.da_r, dr1 + hdt * e2.da_dr,
+        th2 + hdt * e2.db_th, om2 + hdt * e2.db_om, r2 + hdt * e2.db_r, dr2 + hdt * e2.db_dr,
+        m1, m2, L1, L2, k1, k2
+      );
+      const e4 = systemDeriv(
+        th1 + dt * e3.da_th, om1 + dt * e3.da_om, r1 + dt * e3.da_r, dr1 + dt * e3.da_dr,
+        th2 + dt * e3.db_th, om2 + dt * e3.db_om, r2 + dt * e3.db_r, dr2 + dt * e3.db_dr,
+        m1, m2, L1, L2, k1, k2
+      );
+      const s6 = dt / 6.0;
+      return {
+        th1: th1 + s6 * (e1.da_th + 2.0 * e2.da_th + 2.0 * e3.da_th + e4.da_th),
+        om1: om1 + s6 * (e1.da_om + 2.0 * e2.da_om + 2.0 * e3.da_om + e4.da_om),
+        r1: r1 + s6 * (e1.da_r + 2.0 * e2.da_r + 2.0 * e3.da_r + e4.da_r),
+        dr1: dr1 + s6 * (e1.da_dr + 2.0 * e2.da_dr + 2.0 * e3.da_dr + e4.da_dr),
+        th2: th2 + s6 * (e1.db_th + 2.0 * e2.db_th + 2.0 * e3.db_th + e4.db_th),
+        om2: om2 + s6 * (e1.db_om + 2.0 * e2.db_om + 2.0 * e3.db_om + e4.db_om),
+        r2: r2 + s6 * (e1.db_r + 2.0 * e2.db_r + 2.0 * e3.db_r + e4.db_r),
+        dr2: dr2 + s6 * (e1.db_dr + 2.0 * e2.db_dr + 2.0 * e3.db_dr + e4.db_dr),
+      };
+    };
+
+    const TWO_PI = 2 * std.acos(0);
+    const circDiff = (a: number) => {
+      'use gpu';
+      return a - std.floor(a / TWO_PI + 0.5) * TWO_PI;
+    };
+
+    const divInitCell = (cellIndex: number) => {
+      'use gpu';
+      const p = divInitLayout.$.params;
+      const res = p.resolution;
+      const x = cellIndex % d.u32(res);
+      const y = cellIndex / d.u32(res);
+      const u = d.f32(x) / res;
+      const v = d.f32(y) / res;
+      const omu = 1.0 - u;
+      const omv = 1.0 - v;
+      const bth1 = omu * omv * p.cA00_th + u * omv * p.cA10_th + omu * v * p.cA01_th + u * v * p.cA11_th;
+      const bom1 = omu * omv * p.cA00_om + u * omv * p.cA10_om + omu * v * p.cA01_om + u * v * p.cA11_om;
+      const br1 = omu * omv * p.cA00_r + u * omv * p.cA10_r + omu * v * p.cA01_r + u * v * p.cA11_r;
+      const bdr1 = omu * omv * p.cA00_dr + u * omv * p.cA10_dr + omu * v * p.cA01_dr + u * v * p.cA11_dr;
+      divInitLayout.$.baseStateA[cellIndex] = ElasticStateA({ theta1: bth1, omega1: bom1, stretch1: br1, stretchRate1: bdr1 });
+      const bth2 = omu * omv * p.cB00_th + u * omv * p.cB10_th + omu * v * p.cB01_th + u * v * p.cB11_th;
+      const bom2 = omu * omv * p.cB00_om + u * omv * p.cB10_om + omu * v * p.cB01_om + u * v * p.cB11_om;
+      const br2 = omu * omv * p.cB00_r + u * omv * p.cB10_r + omu * v * p.cB01_r + u * v * p.cB11_r;
+      const bdr2 = omu * omv * p.cB00_dr + u * omv * p.cB10_dr + omu * v * p.cB01_dr + u * v * p.cB11_dr;
+      divInitLayout.$.baseStateB[cellIndex] = ElasticStateB({ theta2: bth2, omega2: bom2, stretch2: br2, stretchRate2: bdr2 });
+      const px = d.f32(x) / res;
+      const py = d.f32(y) / res;
+      const h1 = (hash(px * 1000 + p.seed, py * 1000 + p.seed) * 2 - 1) * p.perturb;
+      const h2 = (hash(px * 1000 + 100 + p.seed, py * 1000 + p.seed) * 2 - 1) * p.perturb;
+      divInitLayout.$.pertStateA[cellIndex] = ElasticStateA({ theta1: bth1 + h1, omega1: bom1, stretch1: br1, stretchRate1: bdr1 });
+      divInitLayout.$.pertStateB[cellIndex] = ElasticStateB({ theta2: bth2 + h2, omega2: bom2, stretch2: br2, stretchRate2: bdr2 });
+      divInitLayout.$.divData[cellIndex] = DataCell({ r: 0, g: 0, b: 0, a: 1 });
+    };
+
+    const divStepCell = (cellIndex: number) => {
+      'use gpu';
+      const p = divStepLayout.$.params;
+      const bA = divStepLayout.$.baseCurrentA[cellIndex];
+      const bB = divStepLayout.$.baseCurrentB[cellIndex];
+      const pA = divStepLayout.$.pertCurrentA[cellIndex];
+      const pB = divStepLayout.$.pertCurrentB[cellIndex];
+      const bn = rk4Step(bA.theta1, bA.omega1, bA.stretch1, bA.stretchRate1, bB.theta2, bB.omega2, bB.stretch2, bB.stretchRate2, p.m1, p.m2, p.L1, p.L2, p.k1, p.k2, p.dt);
+      const pn = rk4Step(pA.theta1, pA.omega1, pA.stretch1, pA.stretchRate1, pB.theta2, pB.omega2, pB.stretch2, pB.stretchRate2, p.m1, p.m2, p.L1, p.L2, p.k1, p.k2, p.dt);
+      divStepLayout.$.baseNextA[cellIndex] = ElasticStateA({ theta1: bn.th1, omega1: bn.om1, stretch1: bn.r1, stretchRate1: bn.dr1 });
+      divStepLayout.$.baseNextB[cellIndex] = ElasticStateB({ theta2: bn.th2, omega2: bn.om2, stretch2: bn.r2, stretchRate2: bn.dr2 });
+      divStepLayout.$.pertNextA[cellIndex] = ElasticStateA({ theta1: pn.th1, omega1: pn.om1, stretch1: pn.r1, stretchRate1: pn.dr1 });
+      divStepLayout.$.pertNextB[cellIndex] = ElasticStateB({ theta2: pn.th2, omega2: pn.om2, stretch2: pn.r2, stretchRate2: pn.dr2 });
+      const dt1 = circDiff(bn.th1 - pn.th1);
+      const dw1 = bn.om1 - pn.om1;
+      const ds1 = bn.r1 - pn.r1;
+      const dd1 = bn.dr1 - pn.dr1;
+      const dt2 = circDiff(bn.th2 - pn.th2);
+      const dw2 = bn.om2 - pn.om2;
+      const ds2 = bn.r2 - pn.r2;
+      const dd2 = bn.dr2 - pn.dr2;
+      const dist = std.sqrt(dt1*dt1 + dw1*dw1 + ds1*ds1 + dd1*dd1 + dt2*dt2 + dw2*dw2 + ds2*ds2 + dd2*dd2);
+      const data = divStepLayout.$.divData[cellIndex];
+      if (dist > 0.05 && data.g < 0.5) {
+        divStepLayout.$.divData[cellIndex] = DataCell({ r: p.frameCounter, g: 1, b: 0, a: 1 });
+      }
+    };
+
+    this.divInitPipeline = root.createGuardedComputePipeline(divInitCell);
+    this.divStepPipeline = root.createGuardedComputePipeline(divStepCell);
+    this.divInitBG = root.createBindGroup(this.divInitLayout, {
+      baseStateA: stateAa, baseStateB: stateBa,
+      pertStateA: this.pertStateAa, pertStateB: this.pertStateBa,
+      divData: this.divDataBuf, params: this.divParamsBuffer,
+    });
+    this.divStepFwd = root.createBindGroup(this.divStepLayout, {
+      baseCurrentA: stateAa, baseCurrentB: stateBa,
+      pertCurrentA: this.pertStateAa, pertCurrentB: this.pertStateBa,
+      baseNextA: stateAb, baseNextB: stateBb,
+      pertNextA: this.pertStateAb, pertNextB: this.pertStateBb,
+      divData: this.divDataBuf, params: this.divParamsBuffer,
+    });
+    this.divStepBwd = root.createBindGroup(this.divStepLayout, {
+      baseCurrentA: stateAb, baseCurrentB: stateBb,
+      pertCurrentA: this.pertStateAb, pertCurrentB: this.pertStateBb,
+      baseNextA: stateAa, baseNextB: stateBa,
+      pertNextA: this.pertStateAa, pertNextB: this.pertStateBa,
+      divData: this.divDataBuf, params: this.divParamsBuffer,
+    });
   }
 
   updateParams(config: SimulationConfig): void {
@@ -196,7 +352,30 @@ export class ElasticSystem implements System {
     }
   }
 
+  initDivergence(seed: number, perturb: number): void {
+    const cfg = this.lastConfig;
+    this.divParamsBuffer.write(this.buildDivParamsData(cfg, seed, perturb));
+    this.divFrameCounter = 0;
+    this.divInitPipeline.with(this.divInitBG).dispatchThreads(this.cellCount);
+    this._readIndex = 0;
+  }
+
+  divergenceStep(): void {
+    this.divFrameCounter++;
+    const cfg = this.lastConfig;
+    const data = this.buildDivParamsData(cfg, 0, 0);
+    data.frameCounter = this.divFrameCounter;
+    this.divParamsBuffer.write(data);
+    if (this._readIndex === 0) {
+      this.divStepPipeline.with(this.divStepFwd).dispatchThreads(this.cellCount);
+    } else {
+      this.divStepPipeline.with(this.divStepBwd).dispatchThreads(this.cellCount);
+    }
+    this._readIndex = this._readIndex === 0 ? 1 : 0;
+  }
+
   private buildParamsData(config: SimulationConfig) {
+    this.lastConfig = config;
     const corners = computeCorners(config);
     const cA00 = elasticPackA(corners[0]);
     const cA10 = elasticPackA(corners[1]);
@@ -220,6 +399,31 @@ export class ElasticSystem implements System {
     };
   }
 
+  private buildDivParamsData(config: SimulationConfig, seed: number, perturb: number) {
+    const corners = computeCorners(config);
+    const cA00 = elasticPackA(corners[0]);
+    const cA10 = elasticPackA(corners[1]);
+    const cA01 = elasticPackA(corners[2]);
+    const cA11 = elasticPackA(corners[3]);
+    const cB00 = elasticPackB(corners[0]);
+    const cB10 = elasticPackB(corners[1]);
+    const cB01 = elasticPackB(corners[2]);
+    const cB11 = elasticPackB(corners[3]);
+    return {
+      m1: config.m1, m2: config.m2, L1: config.L1, L2: config.L2,
+      k1: config.k1, k2: config.k2, dt: config.dt, resolution: config.resolution,
+      seed: seed, perturb: perturb, frameCounter: 0,
+      cA00_th: cA00[0], cA00_om: cA00[1], cA00_r: cA00[2], cA00_dr: cA00[3],
+      cA10_th: cA10[0], cA10_om: cA10[1], cA10_r: cA10[2], cA10_dr: cA10[3],
+      cA01_th: cA01[0], cA01_om: cA01[1], cA01_r: cA01[2], cA01_dr: cA01[3],
+      cA11_th: cA11[0], cA11_om: cA11[1], cA11_r: cA11[2], cA11_dr: cA11[3],
+      cB00_th: cB00[0], cB00_om: cB00[1], cB00_r: cB00[2], cB00_dr: cB00[3],
+      cB10_th: cB10[0], cB10_om: cB10[1], cB10_r: cB10[2], cB10_dr: cB10[3],
+      cB01_th: cB01[0], cB01_om: cB01[1], cB01_r: cB01[2], cB01_dr: cB01[3],
+      cB11_th: cB11[0], cB11_om: cB11[1], cB11_r: cB11[2], cB11_dr: cB11[3],
+    };
+  }
+
   private zeroStateA() {
     return Array.from({ length: this.cellCount }, () => ({ theta1: 0, omega1: 0, stretch1: 0, stretchRate1: 0 }));
   }
@@ -230,5 +434,9 @@ export class ElasticSystem implements System {
 
   private zeroDataArray() {
     return Array.from({ length: this.cellCount }, () => ({ r: 0, g: 0, b: 0, a: 0 }));
+  }
+
+  private zeroDivDataArray() {
+    return Array.from({ length: this.cellCount }, () => ({ r: 0, g: 0, b: 0, a: 1 }));
   }
 }
