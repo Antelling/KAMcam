@@ -32,12 +32,21 @@ A browser-based **chaos visualization** for double-pendulum-family systems. It r
 | `@webgpu/types` | latest dev dep | WebGPU TypeScript types |
 | `vite` | `^6` | Bundler/dev server |
 | `typescript` | `~5.7` | Language |
+| `tsover` *(optional, recommended)* | latest | Operator overloading for `'use gpu'` vector math (`vec * scalar`) |
 
 **Install command** (run once at project root):
 ```sh
 npm install typegpu
 npm install -D unplugin-typegpu @webgpu/types vite typescript
 ```
+
+**For vector operator overloading** (lets you write `a * b` where one side is a `d.vec*f` instead of `std.mul`):
+```sh
+npm install -D tsover
+```
+Then follow the [tsover setup guide](https://software-mansion-labs.github.io/tsover/docs). Without tsover, all vector arithmetic must use explicit function calls (`std.mul`, `std.add`) or component-wise construction (`d.vec2f(v.x * k, v.y * k)`). Scalar-only functions work without tsover.
+
+**Status**: typegpu 0.11.9, unplugin-typegpu 0.11.6, vite 6.4.3, typescript 5.7.x — all verified working together. The project skeleton (package.json, tsconfig, vite config, Context.ts, main.ts) is already committed and `npm run build` passes.
 
 **No other runtime deps.** No `mp4-muxer`, no `three`, no glsl plugins. If you think you need another dependency, you don't — ask first.
 
@@ -230,22 +239,26 @@ KAMcam/
 
 ## 6. TypeGPU API primer (correct patterns — copy these)
 
-Verified against the canonical TypeGPU examples (`ComputeShadersBindGroupsRuntime.ts`, `simulation/boids/index.ts` in the software-mansion/TypeGPU repo).
+**Verified during project setup against typegpu 0.11.9 + unplugin-typegpu 0.11.6.** Every pattern below was type-checked and built successfully. The canonical TypeGPU examples (`ComputeShadersBindGroupsRuntime.ts`, `simulation/boids/index.ts` in the software-mansion/TypeGPU repo) corroborate these.
 
 ### 6.1 Imports
 ```ts
 import { tgpu, d, std, common } from 'typegpu';
+import type { TgpuRoot } from 'typegpu';
 ```
 - `tgpu` — core: `tgpu.init()`, `tgpu.bindGroupLayout`, `tgpu.vertexFn`, `tgpu.fragmentFn`
 - `d` — data types: `d.f32`, `d.u32`, `d.i32`, `d.vec2f`, `d.vec3f`, `d.vec4f`, `d.vec2u`, `d.struct({...})`, `d.arrayOf(T, n)`, `d.builtin`
 - `std` — WGSL stdlib: `std.sin`, `std.cos`, `std.sqrt`, `std.log`, `std.exp`, `std.atan2`, `std.clamp`, `std.mix`, `std.min`, `std.max`, `std.abs`, `std.fract`, `std.floor`, `std.normalize`, `std.length`, `std.distance`, `std.smoothstep`, `std.fwidth`, `std.pow`, `std.sign`, `std.mod`
 - `common` — `common.fullScreenTriangle` (a built-in vertex shader for fullscreen passes)
+- **Type-only imports**: `TgpuRoot` and other `Tgpu*` type names must be imported with `import type { ... }` (they are type-only exports; `isolatedModules: true` enforces this).
 
 ### 6.2 Init + canvas
 ```ts
 const root = await tgpu.init();
-const context = root.configureContext({ canvas, alphaMode: 'premultiplied' });
+const context: GPUCanvasContext = root.configureContext({ canvas, alphaMode: 'premultiplied' });
 ```
+- `tgpu.init()` returns a `TgpuRoot` (import its type with `import type`).
+- `root.configureContext()` returns the **standard `GPUCanvasContext`** from `@webgpu/types`, not a TypeGPU-specific type.
 
 ### 6.3 Structs and types
 ```ts
@@ -288,7 +301,7 @@ const bindGroup = root.createBindGroup(stepLayout, {
 
 ### 6.6 `'use gpu'` functions
 ```ts
-const computeAccelerations = (theta1: d.f32, omega1: d.f32, theta2: d.f32, omega2: d.f32) => {
+const computeAccelerations = (theta1: number, omega1: number, theta2: number, omega2: number) => {
   'use gpu';
   const delta = theta1 - theta2;
   const sinDelta = std.sin(delta);
@@ -299,13 +312,15 @@ const computeAccelerations = (theta1: d.f32, omega1: d.f32, theta2: d.f32, omega
 ```
 - A `'use gpu'` function can call other `'use gpu'` functions freely.
 - External TypeGPU resources (buffers, uniforms, bind-group-helpers) are referenced via the layout's `.$` accessor (see 6.7) — the unplugin transpiler collects these automatically.
-- **Type casting**: when doing `a / count` where `count` is a JS number, cast with `d.f32(count)` if needed. Vector arithmetic with `d.f32` literals works directly.
+- **Scalar parameters are typed `number`**, NOT `d.f32`. The `d.f32` value is used for struct fields and buffer declarations; function parameters use the JS `number` type. Same for `d.u32`/`d.i32` — use `number` in signatures. Vector parameters DO use the vector types: `d.v2f`, `d.v3f`, `d.v4f`.
+- **Vector operator overloading requires `tsover`**: by default, TypeScript does not allow `vec * number` or `number * vec` — it errors with "The left-hand side of an arithmetic operation must be of type 'any', 'number'...". To use infix operators on vectors, install and configure [tsover](https://software-mansion-labs.github.io/tsover/docs) (mentioned in TypeGPU's getting-started). **Without tsover**, use `std.mul(scalar, vec)` or construct vectors explicitly with `d.vec2f(a.x * k, a.y * k)`. Scalar-only arithmetic (`number + number`, `number * number`) works without tsover.
+- **Type casting**: when doing `a / count` where `count` is a JS number inside a context that expects GPU types, cast with `d.f32(count)` if needed. Bare number literals in scalar arithmetic are fine.
 - **No `for` loops with dynamic bounds** unless the bound is a constant or uniform. Fixed-trip loops (e.g. RK4's 4 stages, or `for i in 0..4`) are fine.
 - **`for...of` over a `d.arrayOf`** IS supported and idiomatic (see boids example).
 
 ### 6.7 Accessing bind group resources inside `'use gpu'`
 ```ts
-const step = (cellIndex: d.u32) => {
+const step = (cellIndex: number) => {
   'use gpu';
   const state = stepLayout.$.currentState[cellIndex];
   const a = computeAccelerations(state.theta1, state.omega1, state.theta2, state.omega2);
@@ -319,17 +334,19 @@ const step = (cellIndex: d.u32) => {
 ```
 - `stepLayout.$.fieldName[index]` reads/writes storage arrays.
 - `paramsBuffer.as('uniform')` view accessed as `params.$.fieldName` inside `'use gpu'`.
+- The compute function index parameter is `number` (not `d.u32`) — same scalar rule as 6.6.
+- **Struct construction**: `RigidState({ ... })` creates a value of the struct type for writing into a storage buffer.
 
 ### 6.8 Compute pipelines + dispatch
 ```ts
 const stepPipeline = root.createGuardedComputePipeline(step);
 
-// 2D grid dispatch (resolution × resolution cells):
-stepPipeline.with(bindGroup).dispatchThreads(resolution, resolution);
+// 1D dispatch (N total threads, step takes a single `number` index):
+stepPipeline.with(bindGroup).dispatchThreads(cellCount);
 ```
 - `createGuardedComputePipeline` gives better error messages; prefer it during development.
-- For a 2D cell grid, the compute function takes a `d.u32` linear index and you compute `x = index % resolution; y = index / resolution;` inside. (This avoids ambiguity about 2D dispatch signatures. Dispatch as `dispatchThreads(resolution * resolution)`.)
-- **Actually**, verify dispatch arity against the TypeGPU version. If `dispatchThreads(w, h)` with a `d.v2u` parameter works, prefer it. If not, use 1D dispatch of `res*res` threads and derive x/y. The 1D fallback always works.
+- **The dispatch method is `dispatchThreads()`** (confirmed). `dispatchWorkgroups()` does NOT exist on the guarded pipeline type.
+- **Dispatch arity matches the function signature**: if `step` takes one `number` parameter, dispatch with one argument (`dispatchThreads(count)`). If it takes a `d.v2u`, dispatch with two (`dispatchThreads(w, h)`). For the chaos map, use a 1D dispatch of `resolution * resolution` threads and compute `x = index % resolution; y = index / resolution;` inside the function — this is the simplest and always works within WebGPU's 1D dispatch limit (max ~65535 for the x dimension; 4096² = 16M is within bounds).
 
 ### 6.9 Render pipelines (fullscreen passes)
 ```ts
@@ -495,14 +512,12 @@ Port `stupendulous:src/types/config.ts` **verbatim** into the split files under 
 
 Each phase ends with a **verification gate**. Do not start the next phase until the current one passes. Commit after each phase.
 
-### Phase 1 — Skeleton + tooling + Context
-**Create**: `package.json`, `tsconfig.json`, `vite.config.ts`, `.gitignore`, `index.html` (port of `stupendulous:index.html`), `src/main.ts` (5-line bootstrap), `src/gpu/Context.ts`.
+### Phase 1 — Skeleton + tooling + Context ✅ DONE
+**Status**: committed (commit `22c8a53`). `npm install`, `npm run build`, `npm run typecheck`, and `npm run dev` all pass. The unplugin-typegpu transpiler is verified active — a test `'use gpu'` compute function was built and the WGSL code generator was confirmed in the output bundle (280 kB).
 
-**`src/gpu/Context.ts`** wraps `tgpu.init()` and `root.configureContext()`. Exports a `createContext(canvas): Promise<Context>` function. This is the **only** file that touches raw WebGPU objects.
+**Already created**: `package.json`, `tsconfig.json`, `vite.config.ts` (with `typegpuPlugin()`), `.gitignore`, `index.html` (minimal dark-themed page), `src/main.ts` (bootstrap), `src/gpu/Context.ts` (`createContext(canvas)` wrapping `tgpu.init()` + `configureContext`).
 
-**`src/main.ts`**: gets the canvas, calls `createContext`, logs success.
-
-**Verification**: `npm install && npm run build` passes; `npm run dev` opens a blank dark page with no console errors; the browser console shows the WebGPU adapter was acquired.
+**What's next**: Phase 2 — the rigid system end-to-end.
 
 ### Phase 2 — Rigid system end-to-end (the template)
 Build the rigid system all the way through. This phase establishes every pattern the other systems will copy.
@@ -765,9 +780,14 @@ When implementing a feature, read the corresponding Stupendulous source for refe
 
 ## 14. Final notes for the implementer
 
+- **Phase 1 is already done** — the skeleton builds and the transpiler is verified. Start from Phase 2.
 - **When TypeGPU's API surprises you**: check the live examples at `https://docs.swmansion.com/TypeGPU/examples` (especially `simulation/boids` and `ComputeShadersBindGroups`). The canonical source of truth is the installed package's TypeScript exports and the examples repo.
 - **When a `'use gpu'` function won't compile**: the transpiler supports a subset of JS. No closures over plain JS variables (only over TypeGPU resources via layout `.$`). No `.map`/`.filter`. Fixed-trip `for` loops only. If something won't transpile, hoist it into a separate named `'use gpu'` function and pass values as parameters.
+- **Scalar params are `number`, not `d.f32`** — this is the #1 gotcha. `d.f32` is for struct fields and buffer declarations; function signatures use `number`. Vectors use `d.v2f`/`d.v3f`/`d.v4f`.
+- **Vector arithmetic without tsover**: `vec * scalar` and `vec + vec` will NOT type-check without the `tsover` tool. Either install tsover (recommended for heavy vector math like the physics systems) or use `std.mul(k, vec)` / component-wise construction (`d.vec2f(v.x * k, v.y * k)`).
 - **Matrix types**: if `d.mat4f` / `d.mat3f` aren't available in your TypeGPU version, represent a 4×4 as four `d.vec4f` columns and write Cramer's rule against those. The math in `elastic.glsl` is column-major already.
-- **Numbers in shaders**: a bare JS number literal in a `'use gpu'` function is fine for multiplication, but for division `a / count` may need `d.f32(count)`. When in doubt, cast.
+- **Numbers in shaders**: a bare JS number literal in a `'use gpu'` function is fine for scalar multiplication, but for division `a / count` may need `d.f32(count)`. When in doubt, cast.
+- **`dispatchThreads()` not `dispatchWorkgroups()`** — the method on guarded compute pipelines is `dispatchThreads`.
+- **Type imports**: `TgpuRoot` and friends must be `import type { TgpuRoot }` — they're type-only exports.
 - **Visual parity first, perfection second**: if you can't get pixel-identical output to Stupendulous, that's acceptable as long as the chaos-map structure is recognizably correct. Numerical drift from WGSL vs GLSL rounding is expected.
 - **Read `plan.md` again before each phase.** This file is the spec.
