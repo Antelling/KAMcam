@@ -1,14 +1,8 @@
-import { createContext } from './gpu/Context';
+import { KAMcamApp } from './app/KAMcamApp';
 
 async function main() {
-  const canvas = document.getElementById('canvas') as HTMLCanvasElement | null;
-  if (!canvas) {
-    throw new Error('Canvas element not found');
-  }
-
-  const ctx = await createContext(canvas);
-  console.log('KAMcam bootstrapped — TypeGPU root acquired');
-  void ctx;
+  const app = new KAMcamApp();
+  await app.start();
 }
 
 main().catch((err) => {
