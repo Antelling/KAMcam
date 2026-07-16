@@ -84,17 +84,38 @@ const inferno = (t: number) => {
 const turbo = (t: number) => {
   'use gpu';
   const r = std.clamp((48.0 + 227.0 * std.sin((t - 0.5) * 3.14159265)) / 255.0, 0.0, 1.0);
-  const g = std.clamp((t < 0.5 ? t * 400.0 : (1.0 - t) * 400.0) / 255.0, 0.0, 1.0);
+  let gv: number;
+  if (t < 0.5) {
+    gv = t * 400.0;
+  } else {
+    gv = (1.0 - t) * 400.0;
+  }
+  const g = std.clamp(gv / 255.0, 0.0, 1.0);
   const b = std.clamp((128.0 + 127.0 * std.cos(t * 3.14159265)) / 255.0, 0.0, 1.0);
   return d.vec3f(r, g, b);
 };
 
 const jet = (t: number) => {
   'use gpu';
-  const r = std.clamp(t < 0.5 ? 0.0 : (t - 0.5) * 2.0, 0.0, 1.0);
-  const g = std.clamp(t < 0.25 ? t * 4.0 : t < 0.75 ? 1.0 : (1.0 - t) * 4.0, 0.0, 1.0);
-  const b = std.clamp(t < 0.5 ? (0.5 - t) * 2.0 : 0.0, 0.0, 1.0);
-  return d.vec3f(r, g, b);
+  let rv: number; let gv: number; let bv: number;
+  if (t < 0.5) {
+    rv = 0.0;
+  } else {
+    rv = (t - 0.5) * 2.0;
+  }
+  if (t < 0.25) {
+    gv = t * 4.0;
+  } else if (t < 0.75) {
+    gv = 1.0;
+  } else {
+    gv = (1.0 - t) * 4.0;
+  }
+  if (t < 0.5) {
+    bv = (0.5 - t) * 2.0;
+  } else {
+    bv = 0.0;
+  }
+  return d.vec3f(std.clamp(rv, 0.0, 1.0), std.clamp(gv, 0.0, 1.0), std.clamp(bv, 0.0, 1.0));
 };
 
 const rainbow = (t: number) => {
