@@ -1,4 +1,4 @@
-import { std } from 'typegpu';
+import { d, std } from 'typegpu';
 import { hash } from '../shared/hash';
 
 export const systemDeriv = (
@@ -57,5 +57,5 @@ export const computeResonantTip = (
   const b0 = L0 - a0;
   const ax = -b0 * std.sin(t0);
   const ay = b0 * std.cos(t0);
-  return { x: ax + L1 * std.sin(t1), y: ay - L1 * std.cos(t1) };
+  return d.vec2f(ax + L1 * std.sin(t1), ay - L1 * std.cos(t1));
 };

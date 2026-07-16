@@ -1,9 +1,7 @@
-import { std } from 'typegpu';
+import { d, std } from 'typegpu';
 import { hash } from '../shared/hash';
 
-type V4 = { x: number; y: number; z: number; w: number };
-
-export const det4 = (m0: V4, m1: V4, m2: V4, m3: V4) => {
+export const det4 = (m0: d.v4f, m1: d.v4f, m2: d.v4f, m3: d.v4f) => {
   'use gpu';
   const d00 = m1.y * (m2.z * m3.w - m2.w * m3.z) - m1.z * (m2.y * m3.w - m2.w * m3.y) + m1.w * (m2.y * m3.z - m2.z * m3.y);
   const d01 = m1.x * (m2.z * m3.w - m2.w * m3.z) - m1.z * (m2.x * m3.w - m2.w * m3.x) + m1.w * (m2.x * m3.z - m2.z * m3.x);
@@ -12,20 +10,15 @@ export const det4 = (m0: V4, m1: V4, m2: V4, m3: V4) => {
   return m0.x * d00 - m0.y * d01 + m0.z * d02 - m0.w * d03;
 };
 
-export const scSolve4 = (m0: V4, m1: V4, m2: V4, m3: V4, f0: number, f1: number, f2: number, f3: number) => {
+export const scSolve4 = (m0: d.v4f, m1: d.v4f, m2: d.v4f, m3: d.v4f, f0: number, f1: number, f2: number, f3: number) => {
   'use gpu';
-  const d = det4(m0, m1, m2, m3);
-  const inv = 1.0 / d;
-  const M0 = { x: f0, y: m0.y, z: m0.z, w: m0.w };
-  const M1 = { x: m1.x, y: f1, z: m1.z, w: m1.w };
-  const M2 = { x: m2.x, y: m2.y, z: f2, w: m2.w };
-  const M3 = { x: m3.x, y: m3.y, z: m3.z, w: f3 };
-  return {
-    x: det4(M0, m1, m2, m3) * inv,
-    y: det4(m0, M1, m2, m3) * inv,
-    z: det4(m0, m1, M2, m3) * inv,
-    w: det4(m0, m1, m2, M3) * inv,
-  };
+  const det = det4(m0, m1, m2, m3);
+  const inv = 1.0 / det;
+  const M0 = d.vec4f(f0, m0.y, m0.z, m0.w);
+  const M1 = d.vec4f(m1.x, f1, m1.z, m1.w);
+  const M2 = d.vec4f(m2.x, m2.y, f2, m2.w);
+  const M3 = d.vec4f(m3.x, m3.y, m3.z, f3);
+  return d.vec4f(det4(M0, m1, m2, m3) * inv, det4(m0, M1, m2, m3) * inv, det4(m0, m1, M2, m3) * inv, det4(m0, m1, m2, M3) * inv);
 };
 
 export const systemDeriv = (
@@ -67,10 +60,10 @@ export const systemDeriv = (
   const c12 = std.cos(t1 - t2);
   const c13 = std.cos(t1 - t3);
   const c23 = std.cos(t2 - t3);
-  const R0 = { x: I0, y: -b0 * mu1 * c01, z: -b0 * mu2 * c02, w: -b0 * mu3 * c03 };
-  const R1 = { x: -b0 * mu1 * c01, y: I1, z: -b1 * mu2 * c12, w: -b1 * mu3 * c13 };
-  const R2 = { x: -b0 * mu2 * c02, y: -b1 * mu2 * c12, z: I2, w: -b2 * mu3 * c23 };
-  const R3 = { x: -b0 * mu3 * c03, y: -b1 * mu3 * c13, z: -b2 * mu3 * c23, w: I3 };
+  const R0 = d.vec4f(I0, -b0 * mu1 * c01, -b0 * mu2 * c02, -b0 * mu3 * c03);
+  const R1 = d.vec4f(-b0 * mu1 * c01, I1, -b1 * mu2 * c12, -b1 * mu3 * c13);
+  const R2 = d.vec4f(-b0 * mu2 * c02, -b1 * mu2 * c12, I2, -b2 * mu3 * c23);
+  const R3 = d.vec4f(-b0 * mu3 * c03, -b1 * mu3 * c13, -b2 * mu3 * c23, I3);
 
   const G = 9.81;
   const w0s = w0 * w0;
@@ -168,5 +161,5 @@ export const computeSculptureTip = (
     + (N >= 4.0 ? b2 * std.cos(t2) : 0.0);
   const la = N >= 4.0 ? a3 : N >= 3.0 ? a2 : N >= 2.0 ? a1 : a0;
   const lt = N >= 4.0 ? t3 : N >= 3.0 ? t2 : N >= 2.0 ? t1 : t0;
-  return { x: ax + la * std.sin(lt), y: ay - la * std.cos(lt) };
+  return d.vec2f(ax + la * std.sin(lt), ay - la * std.cos(lt));
 };
