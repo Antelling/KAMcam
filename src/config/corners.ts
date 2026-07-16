@@ -5,16 +5,18 @@ export function computeCorners(
   tileCol = 0,
   tileRow = 0,
 ): [number[], number[], number[], number[]] {
+  const col = (config as any)._tileCol ?? tileCol;
+  const row = (config as any)._tileRow ?? tileRow;
   const ps = config.phaseSpace;
   if (ps.mode === 'tiling') {
     const t = ps.tiling;
     const cols = t.cols;
     const rows = t.rows;
-    const i0 = tileCol;
-    const i1 = t.toroidal ? (tileCol + 1) % cols : Math.min(tileCol + 1, cols);
-    const j0 = tileRow;
-    const j1 = t.toroidal ? (tileRow + 1) % rows : Math.min(tileRow + 1, rows);
-    const get = (col: number, row: number): number[] => t.controlNet[row][col];
+    const i0 = col;
+    const i1 = t.toroidal ? (col + 1) % cols : Math.min(col + 1, cols);
+    const j0 = row;
+    const j1 = t.toroidal ? (row + 1) % rows : Math.min(row + 1, rows);
+    const get = (c: number, r: number): number[] => t.controlNet[r][c];
     return [get(i0, j0).slice(), get(i1, j0).slice(), get(i0, j1).slice(), get(i1, j1).slice()];
   }
   const iv: number[] = [];
