@@ -28,7 +28,7 @@ export class DisplayRenderer {
 
     const displayLayout = this.layout;
 
-    const fragment = (uv: any) => {
+    const fragment = ({ uv }: { uv: d.v2f }) => {
       'use gpu';
       const params = displayLayout.$.params;
       const res = params.resolution;
