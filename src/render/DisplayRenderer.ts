@@ -11,15 +11,17 @@ export class DisplayRenderer {
   private pipeline: any;
   private paramsBuffer: any;
   private bindGroup: any;
+  private dataArrType: any;
 
   constructor(root: TgpuRoot, dataArray: any, cellCount: number) {
     this.root = root;
+    this.dataArrType = d.arrayOf(DataCell, cellCount);
     this.paramsBuffer = root.createBuffer(DisplayUniforms, {
       maxValue: 1, colormap: 6, toneMapping: 0, vizMode: 0,
       resolution: 512, _pad0: 0, _pad1: 0, _pad2: 0,
     }).$usage('uniform');
     this.layout = tgpu.bindGroupLayout({
-      data: { storage: dataArray },
+      data: { storage: this.dataArrType },
       params: { uniform: DisplayUniforms },
     });
     this.bindGroup = root.createBindGroup(this.layout, { data: dataArray, params: this.paramsBuffer });
@@ -72,6 +74,10 @@ export class DisplayRenderer {
   }
 
   update(dataArray: any): void {
+    this.layout = tgpu.bindGroupLayout({
+      data: { storage: this.dataArrType },
+      params: { uniform: DisplayUniforms },
+    });
     this.bindGroup = this.root.createBindGroup(this.layout, { data: dataArray, params: this.paramsBuffer });
   }
 

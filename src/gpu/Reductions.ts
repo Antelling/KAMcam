@@ -20,13 +20,15 @@ export class Reductions {
   private bindGroup: any;
   private maxBuffer: any;
   private paramsBuffer: any;
+  private dataArrType: any;
 
   constructor(root: TgpuRoot, dataArray: any, cellCount: number) {
     this.root = root;
+    this.dataArrType = d.arrayOf(DataCell, cellCount);
     this.maxBuffer = root.createBuffer(MaxArray, new Array(REDUCTION_THREADS).fill(0)).$usage('storage');
     this.paramsBuffer = root.createBuffer(ReduceParams, { totalCells: cellCount, _pad: 0, _pad2: 0, _pad3: 0 }).$usage('uniform');
     this.layout = tgpu.bindGroupLayout({
-      data: { storage: dataArray },
+      data: { storage: this.dataArrType },
       maxBuf: { storage: MaxArray, access: 'mutable' },
       params: { uniform: ReduceParams },
     });
@@ -50,6 +52,10 @@ export class Reductions {
       reduceLayout.$.maxBuf[threadIndex] = localMax;
     };
     this.pipeline = root.createGuardedComputePipeline(reduceMax);
+  }
+
+  updateData(dataArray: any): void {
+    this.bindGroup = this.root.createBindGroup(this.layout, { data: dataArray, maxBuf: this.maxBuffer, params: this.paramsBuffer });
   }
 
   async computeMax(): Promise<number> {
