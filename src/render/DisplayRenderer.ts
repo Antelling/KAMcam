@@ -40,31 +40,31 @@ export class DisplayRenderer {
       let value = 0.0;
       let invert = false;
       if (vm < 0.5) {
-        if (cell.a < 0.5) return { x: 0.1, y: 0.1, z: 0.1, w: 1.0 };
+        if (cell.a < 0.5) return d.vec4f(0.1, 0.1, 0.1, 1);
         value = cell.b;
         invert = true;
       } else if (vm < 1.5) {
-        if (cell.a < 0.5) return { x: 0.1, y: 0.1, z: 0.1, w: 1.0 };
+        if (cell.a < 0.5) return d.vec4f(0.1, 0.1, 0.1, 1);
         value = cell.b;
       } else if (vm < 2.5) {
-        if (cell.a < 0.5) return { x: 1.0, y: 1.0, z: 1.0, w: 1.0 };
+        if (cell.a < 0.5) return d.vec4f(1, 1, 1, 1);
         value = cell.b;
       } else if (vm < 3.5) {
         const angle = std.atan2(cell.g, cell.r);
         const t = angle / 6.28318530718 + 0.5;
         const color = applyColormap(t, params.colormap);
-        return { x: color.r, y: color.g, z: color.b, w: 1.0 };
+        return d.vec4f(color.r, color.g, color.b, 1);
       } else if (vm < 4.5) {
-        if (cell.a < 0.5) return { x: 0.1, y: 0.1, z: 0.1, w: 1.0 };
+        if (cell.a < 0.5) return d.vec4f(0.1, 0.1, 0.1, 1);
         value = cell.b;
       } else {
-        if (cell.a < 0.5) return { x: 0.1, y: 0.1, z: 0.1, w: 1.0 };
+        if (cell.a < 0.5) return d.vec4f(0.1, 0.1, 0.1, 1);
         value = cell.b;
       }
       const t = std.clamp(applyTonemap(value, params.maxValue, params.toneMapping), 0.0, 1.0);
       const ct = invert ? 1.0 - t : t;
       const color = applyColormap(ct, params.colormap);
-      return { x: color.r, y: color.g, z: color.b, w: 1.0 };
+      return d.vec4f(color.r, color.g, color.b, 1);
     };
 
     this.pipeline = root.createRenderPipeline({

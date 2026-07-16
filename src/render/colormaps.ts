@@ -18,16 +18,10 @@ const viridis = (t: number) => {
   const c2b = 37.0 / 255.0;
   if (t < 0.5) {
     const s = t * 2.0;
-    const r = mix3(c0r, c1r, s);
-    const g = mix3(c0g, c1g, s);
-    const b = mix3(c0b, c1b, s);
-    return { r, g, b };
+    return d.vec3f(mix3(c0r, c1r, s), mix3(c0g, c1g, s), mix3(c0b, c1b, s));
   }
   const s = (t - 0.5) * 2.0;
-  const r = mix3(c1r, c2r, s);
-  const g = mix3(c1g, c2g, s);
-  const b = mix3(c1b, c2b, s);
-  return { r, g, b };
+  return d.vec3f(mix3(c1r, c2r, s), mix3(c1g, c2g, s), mix3(c1b, c2b, s));
 };
 
 const magma = (t: number) => {
@@ -43,16 +37,10 @@ const magma = (t: number) => {
   const c2b = 191.0 / 255.0;
   if (t < 0.5) {
     const s = t * 2.0;
-    const r = mix3(c0r, c1r, s);
-    const g = mix3(c0g, c1g, s);
-    const b = mix3(c0b, c1b, s);
-    return { r, g, b };
+    return d.vec3f(mix3(c0r, c1r, s), mix3(c0g, c1g, s), mix3(c0b, c1b, s));
   }
   const s = (t - 0.5) * 2.0;
-  const r = mix3(c1r, c2r, s);
-  const g = mix3(c1g, c2g, s);
-  const b = mix3(c1b, c2b, s);
-  return { r, g, b };
+  return d.vec3f(mix3(c1r, c2r, s), mix3(c1g, c2g, s), mix3(c1b, c2b, s));
 };
 
 const plasma = (t: number) => {
@@ -68,16 +56,10 @@ const plasma = (t: number) => {
   const c2b = 33.0 / 255.0;
   if (t < 0.5) {
     const s = t * 2.0;
-    const r = mix3(c0r, c1r, s);
-    const g = mix3(c0g, c1g, s);
-    const b = mix3(c0b, c1b, s);
-    return { r, g, b };
+    return d.vec3f(mix3(c0r, c1r, s), mix3(c0g, c1g, s), mix3(c0b, c1b, s));
   }
   const s = (t - 0.5) * 2.0;
-  const r = mix3(c1r, c2r, s);
-  const g = mix3(c1g, c2g, s);
-  const b = mix3(c1b, c2b, s);
-  return { r, g, b };
+  return d.vec3f(mix3(c1r, c2r, s), mix3(c1g, c2g, s), mix3(c1b, c2b, s));
 };
 
 const inferno = (t: number) => {
@@ -93,16 +75,10 @@ const inferno = (t: number) => {
   const c2b = 164.0 / 255.0;
   if (t < 0.5) {
     const s = t * 2.0;
-    const r = mix3(c0r, c1r, s);
-    const g = mix3(c0g, c1g, s);
-    const b = mix3(c0b, c1b, s);
-    return { r, g, b };
+    return d.vec3f(mix3(c0r, c1r, s), mix3(c0g, c1g, s), mix3(c0b, c1b, s));
   }
   const s = (t - 0.5) * 2.0;
-  const r = mix3(c1r, c2r, s);
-  const g = mix3(c1g, c2g, s);
-  const b = mix3(c1b, c2b, s);
-  return { r, g, b };
+  return d.vec3f(mix3(c1r, c2r, s), mix3(c1g, c2g, s), mix3(c1b, c2b, s));
 };
 
 const turbo = (t: number) => {
@@ -110,7 +86,7 @@ const turbo = (t: number) => {
   const r = std.clamp((48.0 + 227.0 * std.sin((t - 0.5) * 3.14159265)) / 255.0, 0.0, 1.0);
   const g = std.clamp((t < 0.5 ? t * 400.0 : (1.0 - t) * 400.0) / 255.0, 0.0, 1.0);
   const b = std.clamp((128.0 + 127.0 * std.cos(t * 3.14159265)) / 255.0, 0.0, 1.0);
-  return { r, g, b };
+  return d.vec3f(r, g, b);
 };
 
 const jet = (t: number) => {
@@ -118,7 +94,7 @@ const jet = (t: number) => {
   const r = std.clamp(t < 0.5 ? 0.0 : (t - 0.5) * 2.0, 0.0, 1.0);
   const g = std.clamp(t < 0.25 ? t * 4.0 : t < 0.75 ? 1.0 : (1.0 - t) * 4.0, 0.0, 1.0);
   const b = std.clamp(t < 0.5 ? (0.5 - t) * 2.0 : 0.0, 0.0, 1.0);
-  return { r, g, b };
+  return d.vec3f(r, g, b);
 };
 
 const rainbow = (t: number) => {
@@ -126,15 +102,12 @@ const rainbow = (t: number) => {
   const hue = (1.0 - t) * 0.85;
   const c = hue * 6.0;
   const x = c - std.floor(c);
-  if (hue < 1.0 / 6.0) { const r = x; const g = 1.0; const b = 0.0; return { r, g, b }; }
-  if (hue < 2.0 / 6.0) { const r = 1.0 - x; const g = 1.0; const b = 0.0; return { r, g, b }; }
-  if (hue < 3.0 / 6.0) { const r = 0.0; const g = 1.0; const b = x; return { r, g, b }; }
-  if (hue < 4.0 / 6.0) { const r = 0.0; const g = 1.0 - x; const b = 1.0; return { r, g, b }; }
-  if (hue < 5.0 / 6.0) { const r = x; const g = 0.0; const b = 1.0; return { r, g, b }; }
-  const r = 1.0;
-  const g = 0.0;
-  const b = 1.0 - x;
-  return { r, g, b };
+  if (hue < 1.0 / 6.0) return d.vec3f(x, 1, 0);
+  if (hue < 2.0 / 6.0) return d.vec3f(1 - x, 1, 0);
+  if (hue < 3.0 / 6.0) return d.vec3f(0, 1, x);
+  if (hue < 4.0 / 6.0) return d.vec3f(0, 1 - x, 1);
+  if (hue < 5.0 / 6.0) return d.vec3f(x, 0, 1);
+  return d.vec3f(1, 0, 1 - x);
 };
 
 export const applyColormap = (t: number, mode: number) => {
